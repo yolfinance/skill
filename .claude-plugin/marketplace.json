@@ -1,0 +1,31 @@
+{
+  "name": "yolfi",
+  "owner": {
+    "name": "Yolfi",
+    "url": "https://yolfi.com"
+  },
+  "metadata": {
+    "description": "Yolfi skills marketplace for Claude Code",
+    "version": "1.0.0"
+  },
+  "plugins": [
+    {
+      "name": "yolfi-webhook-integration",
+      "source": "./yolfi-webhook-integration",
+      "description": "Adds Yolfi crypto payment webhooks to a merchant backend with the smallest safe change. Loads current Yolfi docs, inspects the merchant codebase, and integrates via adapter mode or native mode without rewriting business logic.",
+      "version": "1.0.0",
+      "author": {
+        "name": "Yolfi",
+        "url": "https://yolfi.com"
+      },
+      "homepage": "https://docs.yolfi.com",
+      "keywords": [
+        "yolfi",
+        "webhooks",
+        "payments",
+        "crypto",
+        "integration"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "name": "yolfi-webhook-integration",
+  "version": "1.0.0",
+  "description": "Adds Yolfi crypto payment webhooks to a merchant backend with the smallest safe change",
+  "author": {
+    "name": "Yolfi",
+    "url": "https://yolfi.com"
+  },
+  "homepage": "https://docs.yolfi.com",
+  "keywords": [
+    "yolfi",
+    "webhooks",
+    "payments",
+    "crypto",
+    "integration"
+  ]
+}
