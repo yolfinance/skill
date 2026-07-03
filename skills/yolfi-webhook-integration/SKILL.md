@@ -1,6 +1,6 @@
 ---
 name: yolfi-webhook-integration
-description: Use this skill when a merchant wants to add Yolfi crypto payment webhooks to an existing backend or create a new Yolfi webhook integration. Trigger for requests like "add Yolfi webhooks", "integrate Yolfi payments", "reuse my existing payment webhook for Yolfi", "wire Yolfi into my payment callbacks", or "add crypto payment notifications". The skill must analyze the merchant codebase, load current Yolfi docs, and choose the smallest safe integration. Required input - YOLFI_API_KEY, the merchant's Yolfi API key, may be provided in chat.
+description: Use this skill when a merchant wants to add Yolfi crypto payment webhooks to an existing backend or create a new Yolfi webhook integration. Trigger for requests like "add Yolfi webhooks", "integrate Yolfi payments", "reuse my existing payment webhook for Yolfi", "wire Yolfi into my payment callbacks", or "add crypto payment notifications". The skill must analyze the merchant codebase, load current Yolfi docs, and choose the smallest safe integration. Required input - YOLFI_API_KEY, the merchant's Yolfi API key, may be provided in chat or discovered in the merchant's git-ignored env files.
 ---
 
 # Yolfi Webhook Integration
@@ -44,6 +44,21 @@ Always load current Yolfi docs before deciding what to implement:
 Do not copy event names, payload schemas, adapter mappings, or provider-specific details into this skill. Those details belong in the docs and may change.
 
 If both docs sources are unreachable and no user-provided copy is available, stop and ask before editing.
+
+## Official Toolkit - @yolfi/agent
+
+The official agent kit (`@yolfi/agent`, github.com/yolfinance/yolfi-agent) ships an SDK, a `yolfi` CLI, and an MCP server. Prefer it over hand-rolling Yolfi API calls:
+
+- Signature verification: reuse or mirror `verifyWebhookSignature` from `@yolfi/agent` (raw body, HMAC-SHA256, base64 digest, timing-safe compare with a length guard).
+- Test webhooks: use `signWebhookPayload(payload, apiKey)` to generate valid signed requests against a local server during verification.
+- Provisioning: when the user's goal is selling with crypto, create paylinks and configure the organization webhook through the CLI (`yolfi paylinks:create`, `yolfi webhooks:configure`) or the MCP tools (`yolfi_paylinks_create`, `yolfi_webhooks_configure`) instead of leaving those steps to the user. Collect product name, price, currency, and recurring interval from the user first; never invent them.
+- API schemas that are absent from the docs (paylink create body, public payment create) live in the repo's `examples/` directory.
+
+Platform constraints to respect (re-verify against current docs before relying on them):
+
+- A paylink's price is immutable after creation; changing the price means creating a new paylink.
+- An organization has exactly one webhook URL and one adapter, so Adapter Mode and Native Mode cannot both receive events from the same org at the same time.
+- There is no documented way to pass a merchant reference (clientReferenceId) through a paylink checkout URL; plan user/order resolution around collected email or server-side payment creation instead.
 
 ## Core Rules
 
@@ -106,11 +121,20 @@ Native event handling rules:
 
 ### 1. Validate Inputs
 
-- If `YOLFI_API_KEY` is missing or blank after trimming, ask for it.
+- Before asking for the key, check git-ignored env files and secret config for an existing `YOLFI_API_KEY` and use it when present.
+- If no key is found and none was provided in chat, ask for it.
 - Use the provided key to configure runtime verification and to generate valid local webhook checks when needed.
 - Treat API keys as opaque. Do not validate prefixes.
 - Never print the full key.
 - Never write the key into source files.
+
+After the key validates, fetch the organization profile (`GET /api/private/organization/current`) and surface likely misconfigurations before integrating:
+
+- Placeholder organization name - payers see it on every checkout page.
+- Placeholder or localhost webhook URL, or an adapter that conflicts with the mode about to be chosen.
+- Missing settlement accounts or a pending onboarding status.
+
+Report these findings; do not change organization settings without explicit user approval.
 
 ### 2. Load Docs
 
@@ -145,9 +169,18 @@ Classify the existing payment flow:
 - **No payment backend logic:** the product needs a new native Yolfi webhook skeleton.
 - **Unsafe or unclear:** provider API coupling or business boundaries make automatic routing risky.
 
-After classification, ask the user a direct choice before implementation (single decision point):
+After classification, ask the user a direct choice before implementation (single decision point).
 
-- If existing payment/webhook endpoint exists: ask whether to integrate into existing endpoint or create a new Yolfi endpoint.
+Frame the question by payment goal, not by webhook plumbing. First establish who pays whom and what the merchant expects to see:
+
+- **Sell with crypto:** the merchant's own customers pay the merchant; the expected outcome is a visible crypto checkout (paylink/button) plus a webhook that grants access.
+- **Process crypto events:** the merchant ingests Yolfi payment events into an existing pipeline (attribution, analytics, bookkeeping); no checkout change is expected.
+
+If the repo contains more than one payment surface (for example the product's own billing plus processing of third-party payments), require an explicit surface choice in these goal terms before offering endpoint options. A user who wants a crypto checkout button will not recognize that goal in a webhook-endpoint question.
+
+Then offer the endpoint options for the chosen surface:
+
+- If an existing payment/webhook endpoint exists on that surface: ask whether to integrate into the existing endpoint or create a new Yolfi endpoint.
 - If no existing payment/webhook endpoint exists: proceed with a new endpoint skeleton.
 
 ### 4. Resolve Plan Mapping
@@ -256,6 +289,8 @@ Verify the selected integration with the merchant's framework and test style:
 - Provider API calls are not executed for Yolfi adapter payloads unless explicitly safe.
 - Tests or local checks prove the route uses raw body verification.
 - Committed tests use a fixture secret, not a real merchant key.
+
+Prefer generating the signed test request with `signWebhookPayload` from `@yolfi/agent` (or an equivalent local HMAC helper) so the check exercises the real header and raw-body path end to end. The minimum live check against a running server is three requests: one valid signature, one duplicate delivery of the same event, one tampered signature.
 
 ## Handoff
 
