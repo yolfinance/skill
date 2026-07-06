@@ -58,7 +58,7 @@ Platform constraints to respect (re-verify against current docs before relying o
 
 - A paylink's price is immutable after creation; changing the price means creating a new paylink.
 - An organization has exactly one webhook URL and one adapter, so Adapter Mode and Native Mode cannot both receive events from the same org at the same time.
-- There is no documented way to pass a merchant reference (clientReferenceId) through a paylink checkout URL; plan user/order resolution around collected email or server-side payment creation instead.
+- A merchant reference can be passed through the paylink checkout URL as the `clientReferenceId` query param (the hosted checkout forwards it, along with `email`/`name`/`phone`/`subscriptionId`, into the `POST /api/public/payments` body). It surfaces as `customer.clientReferenceId` on payment/invoice webhook events (e.g. payment confirmed); subscription lifecycle events carry only customer email + name, so resolve those by email.
 
 ## Core Rules
 
