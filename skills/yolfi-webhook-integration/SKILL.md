@@ -50,15 +50,15 @@ If both docs sources are unreachable and no user-provided copy is available, sto
 The official agent kit (`@yolfi/agent`, github.com/yolfinance/yolfi-agent) ships an SDK, a `yolfi` CLI, and an MCP server. Prefer it over hand-rolling Yolfi API calls:
 
 - Signature verification: reuse or mirror `verifyWebhookSignature` from `@yolfi/agent` (raw body, HMAC-SHA256, base64 digest, timing-safe compare with a length guard).
-- Test webhooks: use `signWebhookPayload(payload, apiKey)` to generate valid signed requests against a local server during verification.
-- Provisioning: when the user's goal is selling with crypto, create paylinks and configure the organization webhook through the CLI (`yolfi paylinks:create`, `yolfi webhooks:configure`) or the MCP tools (`yolfi_paylinks_create`, `yolfi_webhooks_configure`) instead of leaving those steps to the user. Collect product name, price, currency, and recurring interval from the user first; never invent them.
+- Test webhooks: use `signWebhookPayload(payload, endpointSigningSecret)` to generate valid signed requests against a local server during verification. Never sign or verify webhooks with `YOLFI_API_KEY`.
+- Provisioning: create paylinks and independent webhook endpoints through the CLI (`yolfi paylinks:create`, `yolfi webhooks:add`) or MCP (`yolfi_paylinks_create`, `yolfi_webhooks_configure`). Save each endpoint's one-time returned signing secret.
 - API schemas that are absent from the docs (paylink create body, public payment create) live in the repo's `examples/` directory.
 
 Platform constraints to respect (re-verify against current docs before relying on them):
 
 - A paylink's price is immutable after creation; changing the price means creating a new paylink.
-- An organization has exactly one webhook URL and one adapter, so Adapter Mode and Native Mode cannot both receive events from the same org at the same time.
-- A merchant reference can be passed through the paylink checkout URL as the `clientReferenceId` query param (the hosted checkout forwards it, along with `email`/`name`/`phone`/`subscriptionId`, into the `POST /api/public/payments` body). It surfaces as `customer.clientReferenceId` on payment/invoice webhook events (e.g. payment confirmed); subscription lifecycle events carry only customer email + name, so resolve those by email.
+- An organization can have multiple independent webhook endpoints. Each endpoint has its own URL, adapter, enabled state, delivery history, retries, and signing secret. Public adapters are `NONE` (native Yolfi), `STRIPE`, and `LEMON_SQUEEZY`.
+- Pass a stable merchant-side customer/user id as `clientReferenceId` when lifecycle webhooks must resolve ownership. Native payloads expose `data.customer.clientReferenceId`; Stripe Checkout Session uses `data.object.client_reference_id`; Stripe Invoice/Subscription use `data.object.metadata.client_reference_id`; Lemon Squeezy uses `meta.custom_data.client_reference_id`.
 
 ## Core Rules
 
@@ -77,7 +77,7 @@ Platform constraints to respect (re-verify against current docs before relying o
 
 ## Integration Modes
 
-Choose exactly one mode. Do not create a hybrid provider route plus native Yolfi lifecycle handler.
+Choose one mode per endpoint and business surface. Multiple endpoints may coexist (for example, `STRIPE` for billing and `NONE` for analytics), but do not mix provider-shaped and native lifecycle handling inside one route.
 
 ### Adapter Mode
 
@@ -123,7 +123,7 @@ Native event handling rules:
 
 - Before asking for the key, check git-ignored env files and secret config for an existing `YOLFI_API_KEY` and use it when present.
 - If no key is found and none was provided in chat, ask for it.
-- Use the provided key to configure runtime verification and to generate valid local webhook checks when needed.
+- Use the API key only for Yolfi API authorization. Use the target endpoint's signing secret for runtime verification and signed local webhook checks.
 - Treat API keys as opaque. Do not validate prefixes.
 - Never print the full key.
 - Never write the key into source files.
@@ -131,7 +131,7 @@ Native event handling rules:
 After the key validates, fetch the organization profile (`GET /api/private/organization/current`) and surface likely misconfigurations before integrating:
 
 - Placeholder organization name - payers see it on every checkout page.
-- Placeholder or localhost webhook URL, or an adapter that conflicts with the mode about to be chosen.
+- Existing endpoint URLs that are placeholders/localhost, duplicate the intended business surface, or use an adapter that conflicts with that endpoint's receiver.
 - Missing settlement accounts or a pending onboarding status.
 
 Report these findings; do not change organization settings without explicit user approval.
