@@ -53,7 +53,7 @@ The official agent kit (`@yolfi/agent`, github.com/yolfinance/yolfi-agent) ships
 - Test webhooks: use `signWebhookPayload(payload, endpointSigningSecret)` to generate valid signed requests against a local server during verification. Never sign or verify webhooks with `YOLFI_API_KEY`.
 - Provisioning: create paylinks and independent webhook endpoints through the CLI (`yolfi paylinks:create`, `yolfi webhooks:add`) or MCP (`yolfi_paylinks_create`, `yolfi_webhooks_configure`). Save each endpoint's one-time returned signing secret.
 - Talivia automatic provisioning: the user supplies Talivia with `YOLFI_API_KEY`; Talivia calls the Yolfi endpoint API, Yolfi generates the endpoint signing secret, and Talivia stores that secret separately. The API key authorizes provisioning and never signs or verifies webhooks.
-- Talivia analytics uses a dedicated `NONE` endpoint with `metadataFilters: { "website_id": "<websiteId>" }`.
+- Analytics routing uses one metadata key: `website_id`. Talivia uses a dedicated `NONE` endpoint with `metadataFilters: { "website_id": "<websiteId>" }`; do not introduce consumer-prefixed aliases.
 - API schemas that are absent from the docs (paylink create body, public payment create) live in the repo's `examples/` directory.
 
 Platform constraints to respect (re-verify against current docs before relying on them):
