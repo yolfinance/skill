@@ -52,6 +52,8 @@ The official agent kit (`@yolfi/agent`, github.com/yolfinance/yolfi-agent) ships
 - Signature verification: reuse or mirror `verifyWebhookSignature` from `@yolfi/agent` (raw body, HMAC-SHA256, base64 digest, timing-safe compare with a length guard).
 - Test webhooks: use `signWebhookPayload(payload, endpointSigningSecret)` to generate valid signed requests against a local server during verification. Never sign or verify webhooks with `YOLFI_API_KEY`.
 - Provisioning: create paylinks and independent webhook endpoints through the CLI (`yolfi paylinks:create`, `yolfi webhooks:add`) or MCP (`yolfi_paylinks_create`, `yolfi_webhooks_configure`). Save each endpoint's one-time returned signing secret.
+- Talivia automatic provisioning: the user supplies Talivia with `YOLFI_API_KEY`; Talivia calls the Yolfi endpoint API, Yolfi generates the endpoint signing secret, and Talivia stores that secret separately. The API key authorizes provisioning and never signs or verifies webhooks.
+- Talivia analytics uses a dedicated `NONE` endpoint with `metadataFilters: { "website_id": "<websiteId>" }`.
 - API schemas that are absent from the docs (paylink create body, public payment create) live in the repo's `examples/` directory.
 
 Platform constraints to respect (re-verify against current docs before relying on them):
@@ -216,7 +218,7 @@ Required behavior:
 
 - Keep the original provider signature branch unchanged.
 - Add a Yolfi signature branch selected by Yolfi headers from the current docs.
-- Verify Yolfi with the raw body, `YOLFI_API_KEY`, and the current docs' signature algorithm.
+- Verify Yolfi with the raw body, that endpoint's separately stored signing secret, and the current docs' signature algorithm. Never use `YOLFI_API_KEY` as a webhook signing secret.
 - Parse the verified Yolfi body.
 - Dispatch the parsed adapter payload only into existing provider-shaped event handling.
 - If the target branch calls the provider API, stop. Ask the user to choose a separate native endpoint or provide an existing body-driven handler to call.
